@@ -3,7 +3,7 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from practise import create_new_game, step_game, change_direction, toggle_pause
+from snake import create_new_game, step_game, change_direction, toggle_pause
 
 PORT = 8000
 VALID_DIRECTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
