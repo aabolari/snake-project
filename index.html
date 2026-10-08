@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snake</title>
+    <style>
+      /* ---------- colours live here so they are easy to change ---------- */
+      :root {
+        --page: #e8eeea;
+        --board: #d5e2d9;
+        --grid-line: #c5d5ca;
+        --ink: #14342a;
+        --snake-head: #14342a;
+        --snake-body: #2f6b55;
+        --food: #e4572e;
+        --muted: #4f6b5f;
+        --card: #f6f9f7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: var(--page);
+        color: var(--ink);
+        font-family: sans-serif;
+      }
+
+      .game {
+        width: 100%;
+        max-width: 440px;
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 6px 6px 0 #77928348;
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        font-size: 1.6rem;
+        letter-spacing: 0.02em;
+      }
+
+      .scores {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .scores div {
+        flex: 1;
+        padding: 8px 12px;
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        font-size: 0.95rem;
+      }
+
+      .scores strong {
+        display: block;
+        font-size: 1.5rem;
+        line-height: 1.1;
+      }
+
+      .board {
+        position: relative;
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
+        background: var(--board);
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background: rgba(41, 86, 72, 0.217);
+        color: #647269;
+      }
+
+      .overlay.hidden {
+        display: none;
+      }
+      .overlay h2 {
+        margin: 0 0 6px;
+        font-size: 2rem;
+      }
+      .overlay p {
+        margin: 0 0 18px;
+        color: #f8faf9;
+      }
+
+      button {
+        font: inherit;
+        font-weight: bold;
+        padding: 10px 24px;
+        border: 2px solid #f6f9f7;
+        border-radius: 8px;
+        background: var(--food);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 12px;
+      }
+
+      button.secondary {
+        background: transparent;
+        color: #f6f9f7;
+      }
+
+      button.secondary:hover {
+        background: rgba(246, 249, 247, 0.18);
+      }
+      button.hidden {
+        display: none;
+      }
+
+      button:hover {
+        background: #cf4723;
+      }
+      button:focus-visible {
+        outline: 3px solid #fff;
+        outline-offset: 2px;
+      }
+
+      .hint {
+        margin: 14px 0 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game">
+      <h1>Snake</h1>
+
+      <div class="scores">
+        <div>Score <strong id="score">0</strong></div>
+        <div>High score <strong id="highScore">0</strong></div>
+      </div>
+
+      <div class="board">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <div id="overlay" class="overlay hidden">
+          <h2 id="overlayTitle"></h2>
+          <p id="overlayText"></p>
+          <div class="buttons">
+            <button id="overlayButton" type="button"></button>
+            <button
+              id="overlaySecondary"
+              type="button"
+              class="secondary hidden"
+            ></button>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">
+        Steer with the arrow keys or W A S D.<br />
+        Space or P pauses. Enter or R restarts.<br />
+        <span id="padStatus"
+          >Controller: press any button on it to connect.</span
+        >
+      </p>
+    </main>
+
+    <script>
+      // ---------------------------------------------------------------
+      // The backend (practise.py) decides everything about the game.
+      // This script only does three jobs:
+      //   1. ask the server for the game state and draw it
+      //   2. send key presses to the server
+      //   3. keep asking the server to "tick" so the snake moves
+      // ---------------------------------------------------------------
+
+      const GRID = 20; // must match GRID_WIDTH / GRID_HEIGHT in Python
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const CELL = canvas.width / GRID; // size of one cell in pixels
+
+      const scoreEl = document.getElementById("score");
+      const highScoreEl = document.getElementById("highScore");
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlayTitle");
+      const overlayText = document.getElementById("overlayText");
+      const overlayButton = document.getElementById("overlayButton");
+      const overlaySecondary = document.getElementById("overlaySecondary");
+
+      let state = null; // the latest game dictionary from Python
+
+      // ---------- talking to the server ----------
+
+      async function request(path, method, body) {
+        const options = { method: method };
+        if (body) {
+          options.headers = { "Content-Type": "application/json" };
+          options.body = JSON.stringify(body);
+        }
+        const response = await fetch(path, options);
+        return response.json();
+      }
+
+      async function sendDirection(direction) {
+        try {
+          await request("/direction", "POST", { direction: direction });
+        } catch (error) {
+          console.error("Direction error:", error);
+        }
+      }
+
+      async function togglePause() {
+        try {
+          state = await request("/pause", "POST");
+          render();
+        } catch (error) {
+          console.error("Pause error:", error);
+        }
+      }
+
+      async function restart() {
+        try {
+          state = await request("/reset", "POST");
+          render();
+        } catch (error) {
+          console.error("Reset error:", error);
+        }
+      }
+
+      // ---------- drawing ----------
+
+      function drawGrid() {
+        ctx.strokeStyle = "#c5d5ca";
+        ctx.lineWidth = 1;
+        for (let i = 1; i < GRID; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * CELL, 0);
+          ctx.lineTo(i * CELL, canvas.height);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, i * CELL);
+          ctx.lineTo(canvas.width, i * CELL);
+          ctx.stroke();
+        }
+      }
+
+      function drawFood(food) {
+        ctx.fillStyle = "#e4572e";
+        ctx.beginPath();
+        ctx.arc(
+          food.x * CELL + CELL / 2,
+          food.y * CELL + CELL / 2,
+          CELL / 2 - 3,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+
+      function drawSnake(snake) {
+        for (let i = 0; i < snake.length; i++) {
+          // index 0 is the head, same as in your Python list
+          ctx.fillStyle = i === 0 ? "#14342a" : "#2f6b55";
+          ctx.fillRect(
+            snake[i].x * CELL + 1,
+            snake[i].y * CELL + 1,
+            CELL - 2,
+            CELL - 2,
+          );
+        }
+      }
+
+      function showOverlay(
+        title,
+        text,
+        buttonLabel,
+        buttonAction,
+        secondLabel,
+        secondAction,
+      ) {
+        overlayTitle.textContent = title;
+        overlayText.textContent = text;
+        overlayButton.textContent = buttonLabel;
+        overlayButton.onclick = buttonAction;
+
+        // the second button only appears when a label is given
+        if (secondLabel) {
+          overlaySecondary.textContent = secondLabel;
+          overlaySecondary.onclick = secondAction;
+          overlaySecondary.classList.remove("hidden");
+        } else {
+          overlaySecondary.classList.add("hidden");
+        }
+        overlay.classList.remove("hidden");
+      }
+
+      function render() {
+        if (state === null) return;
+
+        scoreEl.textContent = state.score;
+        highScoreEl.textContent = state.high_score;
+
+        // clear the board, then draw everything again
+        ctx.fillStyle = "#d5e2d9";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+        drawFood(state.food);
+        drawSnake(state.snake);
+
+        // overlay depends on the status sent by Python
+        if (state.status === "GAME_OVER") {
+          showOverlay(
+            "Game over",
+            "Final score: " + state.score,
+            "Play again",
+            restart,
+          );
+        } else if (state.status === "WIN") {
+          showOverlay(
+            "You win!",
+            "The snake filled the board. Score: " + state.score,
+            "Play again",
+            restart,
+          );
+        } else if (state.status === "PAUSED") {
+          showOverlay(
+            "Paused",
+            "Press Space or P to continue.",
+            "Resume",
+            togglePause,
+            "Restart",
+            restart,
+          );
+        } else {
+          overlay.classList.add("hidden");
+        }
+      }
+
+      // ---------- keyboard ----------
+
+      const KEY_TO_DIRECTION = {
+        ArrowUp: "UP",
+        w: "UP",
+        W: "UP",
+        ArrowDown: "DOWN",
+        s: "DOWN",
+        S: "DOWN",
+        ArrowLeft: "LEFT",
+        a: "LEFT",
+        A: "LEFT",
+        ArrowRight: "RIGHT",
+        d: "RIGHT",
+        D: "RIGHT",
+      };
+
+      window.addEventListener("keydown", function (event) {
+        const key = event.key;
+
+        // stop the page from scrolling when arrows or space are pressed
+        if (key.startsWith("Arrow") || key === " ") {
+          event.preventDefault();
+        }
+
+        if (key === " " || key === "p" || key === "P") {
+          togglePause();
+        } else if (key === "Enter" || key === "r" || key === "R") {
+          restart();
+        } else if (KEY_TO_DIRECTION[key]) {
+          sendDirection(KEY_TO_DIRECTION[key]);
+        }
+      });
+
+      // ---------- controller (DualShock, Xbox, etc.) ----------
+      // Browsers give every controller the same "standard" layout:
+      //   buttons 12, 13, 14, 15 = D-pad up, down, left, right
+      //   button 9 = Options / Start,  button 0 = Cross / A,  button 8 = Share / Back
+      const PAD_DPAD = { 12: "UP", 13: "DOWN", 14: "LEFT", 15: "RIGHT" };
+      const PAD_PAUSE = 9;
+      const PAD_CONFIRM = 0;
+      const PAD_RESTART = 8;
+      const STICK_DEADZONE = 0.5; // ignore tiny stick movements
+
+      const padStatus = document.getElementById("padStatus");
+      let lastPressed = {}; // which buttons were held on the previous check
+      let lastStick = null; // which way the stick pointed on the previous check
+
+      // true only on the moment a button goes from "up" to "down"
+      function justPressed(pad, index) {
+        const isDown = pad.buttons[index] ? pad.buttons[index].pressed : false;
+        const wasDown = lastPressed[index] === true;
+        lastPressed[index] = isDown;
+        return isDown && !wasDown;
+      }
+
+      // turns the left stick position into UP / DOWN / LEFT / RIGHT (or null)
+      function getStickDirection(pad) {
+        const x = pad.axes[0];
+        const y = pad.axes[1];
+        if (Math.abs(x) < STICK_DEADZONE && Math.abs(y) < STICK_DEADZONE)
+          return null;
+        if (Math.abs(x) > Math.abs(y)) return x > 0 ? "RIGHT" : "LEFT";
+        return y > 0 ? "DOWN" : "UP";
+      }
+
+      function pollGamepad() {
+        const pads = navigator.getGamepads();
+        const pad = pads[0] || pads[1] || pads[2] || pads[3]; // first connected controller
+
+        if (pad) {
+          for (const index in PAD_DPAD) {
+            if (justPressed(pad, Number(index))) {
+              sendDirection(PAD_DPAD[index]);
+            }
+          }
+
+          const stick = getStickDirection(pad);
+          if (stick !== null && stick !== lastStick) {
+            sendDirection(stick);
+          }
+          lastStick = stick;
+
+          if (justPressed(pad, PAD_PAUSE)) togglePause();
+          if (justPressed(pad, PAD_RESTART)) restart();
+
+          // Cross only restarts when the game has ended, so it can't ruin a run
+          const confirmPressed = justPressed(pad, PAD_CONFIRM);
+          if (
+            confirmPressed &&
+            state &&
+            (state.status === "GAME_OVER" || state.status === "WIN")
+          ) {
+            restart();
+          }
+        }
+
+        requestAnimationFrame(pollGamepad);
+      }
+
+      window.addEventListener("gamepadconnected", function (event) {
+        padStatus.textContent =
+          "Controller connected: D-pad steers, Options pauses, Cross plays again.";
+      });
+
+      window.addEventListener("gamepaddisconnected", function () {
+        padStatus.textContent = "Controller disconnected.";
+      });
+
+      pollGamepad();
+
+      // ---------- the game loop ----------
+
+      // The backend decides the speed (get_delay in practise.py).
+      // The browser just waits as long as it is told to.
+      function getDelay() {
+        if (state === null) return 220; // only used before the first reply arrives
+        return state.delay;
+      }
+
+      async function gameLoop() {
+        const startTime = performance.now();
+        try {
+          if (state === null) {
+            state = await request("/state", "GET");
+          } else if (state.status === "RUNNING") {
+            state = await request("/tick", "POST");
+          }
+          render();
+        } catch (error) {
+          console.error("Loop error (is server.py running?):", error);
+        }
+        // subtract the time the request took, so slow replies don't slow the snake
+        const spent = performance.now() - startTime;
+        setTimeout(gameLoop, Math.max(0, getDelay() - spent));
+      }
+
+      gameLoop();
+    </script>
+  </body>
+</html>
