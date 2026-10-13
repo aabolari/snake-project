@@ -85,10 +85,15 @@ def create_pens():
     message.color(TEXT_COLOUR)
     message.goto(0, -10)
 
+    modal = turtle.Turtle()
+    modal.hideturtle()
+    modal.speed(0)
+    modal.penup()
+
     pens["painter"] = painter
     pens["scoreboard"] = scoreboard
     pens["message"] = message
-
+    pens["modal"] = modal
 
 def setup_ui():
     """Call once at startup. Returns the screen."""
@@ -127,9 +132,19 @@ def draw_game(state):
             colour = HEAD_COLOUR if index == 0 else BODY_COLOUR
             stamp_cell(cell, "square", colour)
 
+
     update_scoreboard(state)
-    show_status_message(state)
+
+    
+    if state["status"] == "game_over":
+        pens["message"].clear() # Hide normal pause messages
+        draw_game_over(state)
+    else:
+        pens["modal"].clear() # Ensure the modal disappears when playing
+        show_status_message(state)
+        
     turtle.update()
+
 
 
 def update_scoreboard(state):
@@ -151,6 +166,44 @@ def show_status_message(state):
     elif state["status"] == "game_over":
         message.write("GAME OVER - press R to restart",
                       align="center", font=("Arial", 18, "bold"))
+
+
+def draw_game_over(state):
+    modal = pens["modal"]
+    modal.clear() # CRITICAL: Prevents ghosting from previous frames
+
+    # Only draw if the game is actually over
+    if state["status"] != "game_over":
+        return
+
+    # 1. Draw the background box
+    modal.goto(-150, 100)
+    modal.color(BORDER_COLOUR, "#0f172a") # Border color, darker fill
+    modal.pendown()
+    modal.pensize(2)
+    modal.begin_fill()
+    for _ in range(2):
+        modal.forward(300)
+        modal.right(90)
+        modal.forward(200)
+        modal.right(90)
+    modal.end_fill()
+    modal.penup()
+
+    # 2. Draw the text
+    modal.goto(0, 40)
+    modal.color("#f87171") # Soft Red
+    modal.write("GAME OVER", align="center", font=("Arial", 24, "bold"))
+
+    modal.goto(0, 0)
+    modal.color(TEXT_COLOUR)
+    score = state["snakes"][0]["score"]
+    high_score = state["high_score"]
+    modal.write(f"SCORE: {score}   HIGH: {high_score}", align="center", font=("Arial", 14, "normal"))
+
+    modal.goto(0, -50)
+    modal.color(HEAD_COLOUR) # Use the snake green for the button text
+    modal.write("Press SPACE to Restart", align="center", font=("Arial", 14, "bold"))
 
 
 # ----------------------------------------------------------------------
