@@ -20,6 +20,34 @@ def setup_screen():
     win.tracer(0)             # we refresh the screen ourselves, once per frame
     return win
 
+def draw_grid():
+    """Draw a faint grid inside the playable area."""
+    half = (GRID_MAX + 0.5) * CELL_SIZE      # Matches the border boundaries exactly
+    grid_pen = turtle.Turtle()
+    grid_pen.hideturtle()
+    grid_pen.speed(0)
+    
+    # Matches the dark theme BACKGROUND_COLOUR ("#1e293b") from config.py[cite: 4]
+    grid_pen.color("#334155") 
+    grid_pen.pensize(1)
+    grid_pen.penup()
+
+    start = int(-half)
+    end = int(half)
+
+    # Draw vertical lines
+    for x in range(start, end + 1, CELL_SIZE):
+        grid_pen.goto(x, end)
+        grid_pen.pendown()
+        grid_pen.goto(x, start)
+        grid_pen.penup()
+
+    # Draw horizontal lines
+    for y in range(start, end + 1, CELL_SIZE):
+        grid_pen.goto(start, y)
+        grid_pen.pendown()
+        grid_pen.goto(end, y)
+        grid_pen.penup()
 
 def draw_board():
     """Draw the border around the playable area (drawn once)."""
@@ -66,6 +94,7 @@ def setup_ui():
     """Call once at startup. Returns the screen."""
     win = setup_screen()
     draw_board()
+    draw_grid()
     create_pens()
     return win
 
