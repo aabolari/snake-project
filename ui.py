@@ -2,10 +2,12 @@
 # forwards key presses. It never moves snakes or checks collisions.
 
 import turtle
+import versus_mode
 from config import (
     CELL_SIZE, GRID_MAX, WINDOW_SIZE,
     BACKGROUND_COLOUR, BORDER_COLOUR, HEAD_COLOUR, BODY_COLOUR,
-    FOOD_COLOUR, OBSTACLE_COLOUR, TEXT_COLOUR, KEY_DIRECTIONS,
+    FOOD_COLOUR, OBSTACLE_COLOUR, TEXT_COLOUR,
+    ARROW_KEYS, WASD_KEYS, SNAKE_COLOURS,
 )
 
 # The few turtles we create ONCE and reuse every frame.
@@ -127,9 +129,10 @@ def draw_game(state):
     for cell in state["obstacles"]:
         stamp_cell(cell, "square", OBSTACLE_COLOUR)
 
-    for snake in state["snakes"]:
+    for number, snake in enumerate(state["snakes"]):
+        head_colour, body_colour = SNAKE_COLOURS[number]     # each snake has its own colours
         for index, cell in enumerate(snake["body"]):
-            colour = HEAD_COLOUR if index == 0 else BODY_COLOUR
+            colour = head_colour if index == 0 else body_colour
             stamp_cell(cell, "square", colour)
 
 
@@ -138,6 +141,9 @@ def draw_game(state):
     if state["status"] == "menu":
         pens["scoreboard"].clear() # Hide scoreboard on menu
         draw_main_menu(state)
+    elif state["status"] == "difficulty":
+        pens["scoreboard"].clear()
+        draw_difficulty_menu(state)
     elif state["status"] == "game_over":
         pens["message"].clear() # Hide normal pause messages
         draw_game_over(state)
@@ -152,11 +158,14 @@ def draw_game(state):
 def update_scoreboard(state):
     scoreboard = pens["scoreboard"]
     scoreboard.clear()
-    score = state["snakes"][0]["score"]       # Member 3: show every snake here later
-    scoreboard.write(
-        f"Score: {score}   High Score: {state['high_score']}",
-        align="center", font=("Arial", 16, "bold"),
-    )
+    if len(state["snakes"]) == 1:
+        text = f"Score: {state['snakes'][0]['score']}   High Score: {state['high_score']}"
+    else:
+        text = ""
+        for snake in state["snakes"]:
+            text += f"{snake['name']}: {snake['score']}   "
+        text += f"High Score: {state['high_score']}"
+    scoreboard.write(text, align="center", font=("Arial", 16, "bold"))
 
 
 def show_status_message(state):
@@ -165,6 +174,18 @@ def show_status_message(state):
     if state["status"] == "paused":
         message.write("PAUSED - press SPACE to resume",
                       align="center", font=("Arial", 18, "bold"))
+    elif state["mode"] != "single" and not versus_mode.all_humans_ready(state):
+        if state["mode"] == "multi":
+            line1 = "P1: W A S D      P2: arrow keys"
+            line2 = "Each player press a direction key to start"
+        else:
+            line1 = "Steer with W A S D or the arrow keys"
+            line2 = "Press a direction key to start"
+        message.goto(0, -70)                  # below the snakes, so the text doesn't cover them
+        message.write(line1, align="center", font=("Arial", 16, "bold"))
+        message.goto(0, -95)
+        message.write(line2, align="center", font=("Arial", 16, "bold"))
+        message.goto(0, -10)                  # put the pen back for the PAUSED message
     elif state["status"] == "game_over":
         message.write("GAME OVER - press R to restart",
                       align="center", font=("Arial", 18, "bold"))
@@ -229,6 +250,22 @@ def draw_main_menu(state):
     draw_ui_card(modal, 0, -140, 300, 80, FOOD_COLOUR, "#450a0a", "VS AI", "Play against the smart snake")
 
 
+def draw_difficulty_menu(state):
+    """The Easy / Medium / Hard cards shown after choosing VS AI."""
+    modal = pens["modal"]
+    modal.clear()
+
+    modal.goto(0, 180)
+    modal.color(TEXT_COLOUR)
+    modal.write("VS AI", align="center", font=("Arial", 28, "bold"))
+    modal.goto(0, 140)
+    modal.write("CHOOSE DIFFICULTY", align="center", font=("Arial", 12, "normal"))
+
+    draw_ui_card(modal, 0, 60, 300, 80, HEAD_COLOUR, "#064e3b", "EASY", "Makes plenty of mistakes (press 1)")
+    draw_ui_card(modal, 0, -40, 300, 80, "#f59e0b", "#451a03", "MEDIUM", "Chases the food (press 2)")
+    draw_ui_card(modal, 0, -140, 300, 80, FOOD_COLOUR, "#450a0a", "HARD", "Never traps itself (press 3)")
+
+
 def draw_game_over(state):
     modal = pens["modal"]
     modal.clear() # CRITICAL: Prevents ghosting from previous frames
@@ -254,13 +291,18 @@ def draw_game_over(state):
     # 2. Draw the text
     modal.goto(0, 40)
     modal.color("#f87171") # Soft Red
-    modal.write("GAME OVER", align="center", font=("Arial", 24, "bold"))
+    title = state.get("result") or "GAME OVER"        # versus modes set a result such as "P1 WINS!"
+    modal.write(title, align="center", font=("Arial", 24, "bold"))
 
     modal.goto(0, 0)
     modal.color(TEXT_COLOUR)
-    score = state["snakes"][0]["score"]
-    high_score = state["high_score"]
-    modal.write(f"SCORE: {score}   HIGH: {high_score}", align="center", font=("Arial", 14, "normal"))
+    if len(state["snakes"]) == 1:
+        text = f"SCORE: {state['snakes'][0]['score']}   HIGH: {state['high_score']}"
+    else:
+        text = ""
+        for snake in state["snakes"]:
+            text += f"{snake['name']}: {snake['score']}   "
+    modal.write(text, align="center", font=("Arial", 14, "normal"))
 
     modal.goto(0, -50)
     modal.color(HEAD_COLOUR) # Use the snake green for the button text
@@ -274,11 +316,18 @@ def bind_keys(on_direction, on_pause, on_restart, on_menu_click):
     """Connect keys to functions that main.py provides."""
     win = turtle.Screen()
     win.listen()
-    for key, direction in KEY_DIRECTIONS.items():
-        win.onkeypress(lambda d=direction: on_direction(d), key)
+    for key, direction in WASD_KEYS.items():
+        win.onkeypress(lambda d=direction: on_direction(d, "wasd"), key)
+    for key, direction in ARROW_KEYS.items():
+        win.onkeypress(lambda d=direction: on_direction(d, "arrows"), key)
     win.onkeypress(on_pause, "space")
     win.onkeypress(on_pause, "p")
     win.onkeypress(on_restart, "r")
+
+    # Number keys pick the 1st, 2nd or 3rd card of whichever menu is showing
+    win.onkeypress(lambda: on_menu_click("single"), "1")
+    win.onkeypress(lambda: on_menu_click("multi"), "2")
+    win.onkeypress(lambda: on_menu_click("ai"), "3")
 
     # The Hit-Testing Function
     def handle_mouse_click(x, y):
