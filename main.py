@@ -47,10 +47,20 @@ def game_tick():
     ui.draw_game(state)
     turtle.ontimer(game_tick, config.TICK_MS)
 
+def handle_menu_selection(mode):
+    """Transition from menu to running state with the selected mode."""
+    if state["status"] == "menu":
+        state["mode"] = mode
+        state["status"] = "running"
+        # In the future, this is where you'll tell game_engine to spawn snake 2 or the AI
+        print(f"Mode selected: {mode}. Game starting!")
 
 def run_game():
     ui.setup_ui()
-    ui.bind_keys(handle_direction, handle_spacebar, handle_restart)
+
+    print(f"BOOT STATE: {state['status']}")
+
+    ui.bind_keys(handle_direction, handle_spacebar, handle_restart, handle_menu_selection)
     game_tick()
     turtle.mainloop()
 

@@ -54,6 +54,8 @@ def new_game_state(high_score=0):
         "obstacles": [],
         "high_score": high_score,
         "status": "running",
+        "status": "menu",  # Changed from "running"
+        "mode": "single",  # New variable: "single", "multi", or "ai"
     }
     state["food"] = spawn_food(state)
     return state

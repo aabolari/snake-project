@@ -135,8 +135,10 @@ def draw_game(state):
 
     update_scoreboard(state)
 
-    
-    if state["status"] == "game_over":
+    if state["status"] == "menu":
+        pens["scoreboard"].clear() # Hide scoreboard on menu
+        draw_main_menu(state)
+    elif state["status"] == "game_over":
         pens["message"].clear() # Hide normal pause messages
         draw_game_over(state)
     else:
@@ -166,6 +168,65 @@ def show_status_message(state):
     elif state["status"] == "game_over":
         message.write("GAME OVER - press R to restart",
                       align="center", font=("Arial", 18, "bold"))
+
+
+# In ui.py
+def draw_ui_card(pen, cx, cy, width, height, theme_color, fill_color, title, subtitle):
+    """Draws a stylized, clickable card centered at (cx, cy) with a solid background."""
+    start_x = cx - (width / 2)
+    start_y = cy + (height / 2)
+
+    # 1. Draw the card outline and filled background
+    pen.penup()
+    pen.goto(start_x, start_y)
+    # The first argument is the border, the second is the inner fill
+    pen.color(theme_color, fill_color) 
+    pen.pensize(3)
+    pen.pendown()
+    
+    pen.begin_fill() # Start tracking the shape area
+    for _ in range(2):
+        pen.forward(width)
+        pen.right(90)
+        pen.forward(height)
+        pen.right(90)
+    pen.end_fill() # Physically paint the interior
+    pen.penup()
+
+    # 2. Draw the Title (Must happen AFTER end_fill)
+    pen.goto(cx, cy + 5)
+    pen.color(TEXT_COLOUR)
+    pen.write(title, align="center", font=("Arial", 16, "bold"))
+
+    # 3. Draw the Subtitle
+    pen.goto(cx, cy - 20)
+    pen.color(theme_color)
+    pen.write(subtitle, align="center", font=("Arial", 10, "normal"))
+
+
+# In ui.py
+def draw_main_menu(state):
+    modal = pens["modal"]
+    modal.clear()
+    
+    if state["status"] != "menu":
+        return
+
+    # Draw Header
+    modal.goto(0, 180)
+    modal.color(TEXT_COLOUR)
+    modal.write("SNAKE ARENA", align="center", font=("Arial", 28, "bold"))
+    modal.goto(0, 140)
+    modal.write("CHOOSE YOUR GAME MODE", align="center", font=("Arial", 12, "normal"))
+
+    # Card 1: Sky Blue Border, Deep Slate Background
+    draw_ui_card(modal, 0, 60, 300, 80, BORDER_COLOUR, "#0f172a", "SINGLE PLAYER", "Classic snake experience")
+    
+    # Card 2: Bright Green Border, Dark Emerald Background
+    draw_ui_card(modal, 0, -40, 300, 80, HEAD_COLOUR, "#064e3b", "MULTIPLAYER", "Challenge another player")
+    
+    # Card 3: Bright Red Border, Dark Crimson Background
+    draw_ui_card(modal, 0, -140, 300, 80, FOOD_COLOUR, "#450a0a", "VS AI", "Play against the smart snake")
 
 
 def draw_game_over(state):
@@ -209,7 +270,7 @@ def draw_game_over(state):
 # ----------------------------------------------------------------------
 # Keyboard
 # ----------------------------------------------------------------------
-def bind_keys(on_direction, on_pause, on_restart):
+def bind_keys(on_direction, on_pause, on_restart, on_menu_click):
     """Connect keys to functions that main.py provides."""
     win = turtle.Screen()
     win.listen()
@@ -218,3 +279,20 @@ def bind_keys(on_direction, on_pause, on_restart):
     win.onkeypress(on_pause, "space")
     win.onkeypress(on_pause, "p")
     win.onkeypress(on_restart, "r")
+
+    # The Hit-Testing Function
+    def handle_mouse_click(x, y):
+        # Check X bounds (Width is 300, so -150 to 150)
+        if -150 <= x <= 150:
+            # Card 1: Y=60, Height=80 (Bounds: 20 to 100)
+            if 20 <= y <= 100:
+                on_menu_click("single")
+            # Card 2: Y=-40, Height=80 (Bounds: -80 to 0)
+            elif -80 <= y <= 0:
+                on_menu_click("multi")
+            # Card 3: Y=-140, Height=80 (Bounds: -180 to -100)
+            elif -180 <= y <= -100:
+                on_menu_click("ai")
+
+    # Bind the left mouse button (btn=1) to our hit-testing function
+    win.onscreenclick(handle_mouse_click, btn=1)
