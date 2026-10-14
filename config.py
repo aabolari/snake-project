@@ -45,3 +45,24 @@ BODY_COLOUR = "#86efac"
 FOOD_COLOUR = "#ef4444"
 OBSTACLE_COLOUR = "#94a3b8"
 TEXT_COLOUR = "#f8fafc"
+
+
+# ----------------------------------------------------------------------
+# Versus modes: 1v1 human ("multi") and human vs AI ("ai")
+# ----------------------------------------------------------------------
+# Two key groups. In 1v1, P1 uses WASD and P2 uses the arrow keys.
+# In single player and vs AI, both groups steer the same human snake.
+ARROW_KEYS = {"Up": "up", "Down": "down", "Left": "left", "Right": "right"}
+WASD_KEYS = {
+    "w": "up", "s": "down", "a": "left", "d": "right",
+    "W": "up", "S": "down", "A": "left", "D": "right",
+}
+
+P1_START = (-8, 0)      # where snake 1 starts
+P2_START = (8, 0)       # where snake 2 (or the AI) starts
+
+# (head colour, body colour) for snake 1 and snake 2
+SNAKE_COLOURS = [(HEAD_COLOUR, BODY_COLOUR), ("#f59e0b", "#fcd34d")]
+
+# Chance (0 to 1) that the AI ignores the food and makes a random safe move
+AI_MISTAKE_CHANCE = {"easy": 0.35, "medium": 0.12, "hard": 0.0}

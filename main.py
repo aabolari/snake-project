@@ -7,6 +7,7 @@ import turtle
 import config
 import game_engine
 import ui
+import versus_mode
 
 # The one shared game state. Every module reads and changes THIS dictionary.
 state = game_engine.new_game_state()
@@ -15,9 +16,10 @@ state = game_engine.new_game_state()
 # ----------------------------------------------------------------------
 # Handlers: called by ui.bind_keys when a key is pressed
 # ----------------------------------------------------------------------
-def handle_direction(direction):
+def handle_direction(direction, keys):
+    """keys says which key group was pressed: "wasd" or "arrows"."""
     if state["status"] == "running":
-        player = state["snakes"][0]
+        player = versus_mode.snake_for_keys(state, keys)
         game_engine.change_direction(player, direction)
 
 
@@ -43,17 +45,29 @@ def game_tick():
     to keys and buttons between frames.
     """
     if state["status"] == "running":
-        game_engine.update_game(state)
+        if state["mode"] == "single":
+            game_engine.update_game(state)
+        else:
+            versus_mode.update_versus(state)
     ui.draw_game(state)
     turtle.ontimer(game_tick, config.TICK_MS)
 
-def handle_menu_selection(mode):
-    """Transition from menu to running state with the selected mode."""
+# The three difficulty cards are drawn in the same three spots as the mode cards,
+# so a click on the top card arrives here as "single", the middle one as "multi", etc.
+DIFFICULTY_BY_CARD = {"single": "easy", "multi": "medium", "ai": "hard"}
+
+
+def handle_menu_selection(choice):
+    """Handle a click (or key 1/2/3) on the main menu or on the difficulty menu."""
     if state["status"] == "menu":
-        state["mode"] = mode
+        if choice == "ai":
+            state["status"] = "difficulty"      # ask Easy / Medium / Hard first
+        else:
+            versus_mode.start_mode(state, choice)
+            state["status"] = "running"
+    elif state["status"] == "difficulty":
+        versus_mode.start_mode(state, "ai", DIFFICULTY_BY_CARD[choice])
         state["status"] = "running"
-        # In the future, this is where you'll tell game_engine to spawn snake 2 or the AI
-        print(f"Mode selected: {mode}. Game starting!")
 
 def run_game():
     ui.setup_ui()
