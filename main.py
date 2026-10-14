@@ -21,8 +21,12 @@ def handle_direction(direction):
         game_engine.change_direction(player, direction)
 
 
-def handle_pause():
-    game_engine.toggle_pause(state)
+def handle_spacebar():
+    """Context-aware input: restarts if dead, pauses if alive."""
+    if state["status"] == "game_over":
+        game_engine.reset_game(state)
+    else:
+        game_engine.toggle_pause(state)
 
 
 def handle_restart():
@@ -46,7 +50,7 @@ def game_tick():
 
 def run_game():
     ui.setup_ui()
-    ui.bind_keys(handle_direction, handle_pause, handle_restart)
+    ui.bind_keys(handle_direction, handle_spacebar, handle_restart)
     game_tick()
     turtle.mainloop()
 
