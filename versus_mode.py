@@ -16,10 +16,14 @@ from ai_player import choose_ai_direction
 from config import P1_START, P2_START, POINTS_PER_FOOD
 
 
-def start_mode(state, mode, ai_level="medium"):
+def start_mode(state, mode, ai_level="medium", obstacles=False):
     """Set up the snakes for the chosen mode. Single player needs no changes."""
     state["mode"] = mode
     if mode == "single":
+        state["obstacles"] = []
+        if obstacles:
+            game_engine.generate_obstacles(state)
+        state["food"] = game_engine.spawn_food(state)  # food must avoid any new obstacles
         return
 
     if mode == "multi":

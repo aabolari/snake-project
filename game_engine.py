@@ -23,10 +23,12 @@
 #   }
 
 import random
+from collections import deque
 from config import (
     GRID_MIN, GRID_MAX,
     DIRECTION_VECTORS, OPPOSITE_DIRECTION,
     POINTS_PER_FOOD,
+     OBSTACLE_COUNT, SAFE_RADIUS,
 )
 
 
@@ -77,6 +79,43 @@ def spawn_food(state):
         return None
     return random.choice(free_cells)
 
+
+def all_free_cells_reachable(obstacles, start):
+    """Flood fill from `start`. True if every non-obstacle cell can be reached."""
+    blocked = set(obstacles)
+    seen = {start}
+    queue = deque([start])
+    while queue:
+        x, y = queue.popleft()
+        for dx, dy in DIRECTION_VECTORS.values():
+            cell = (x + dx, y + dy)
+            if check_wall_collision(cell) or cell in seen or cell in blocked:
+                continue
+            seen.add(cell)
+            queue.append(cell)
+    total_cells = (GRID_MAX - GRID_MIN + 1) ** 2
+    return len(seen) == total_cells - len(blocked)
+
+
+def generate_obstacles(state, count=OBSTACLE_COUNT):
+    """Fill state["obstacles"] with random cells (tuples).
+
+    Skips the area around the snake's start so you can't die on move one,
+    and retries if the layout would wall off part of the board.
+    """
+    head_x, head_y = state["snakes"][0]["body"][0]
+    candidates = [
+        (x, y)
+        for x in range(GRID_MIN, GRID_MAX + 1)
+        for y in range(GRID_MIN, GRID_MAX + 1)
+        if max(abs(x - head_x), abs(y - head_y)) > SAFE_RADIUS
+    ]
+    for attempt in range(50):
+        chosen = random.sample(candidates, count)
+        if all_free_cells_reachable(chosen, (head_x, head_y)):
+            state["obstacles"] = chosen
+            return
+    state["obstacles"] = []      # gave up: play without obstacles rather than crash
 
 # ----------------------------------------------------------------------
 # Steering

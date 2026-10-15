@@ -56,19 +56,28 @@ def game_tick():
 # so a click on the top card arrives here as "single", the middle one as "multi", etc.
 DIFFICULTY_BY_CARD = {"single": "easy", "multi": "medium", "ai": "hard"}
 
-
 def handle_menu_selection(choice):
-    """Handle a click (or key 1/2/3) on the main menu or on the difficulty menu."""
+    """Handle a click (or key 1/2/3) on the main, obstacle or difficulty menu."""
     if state["status"] == "menu":
-        if choice == "ai":
-            state["status"] = "difficulty"      # ask Easy / Medium / Hard first
+        if choice == "single":
+            state["status"] = "obstacle_choice"     # ask obstacles on/off first
+        elif choice == "ai":
+            state["status"] = "difficulty"
         else:
             versus_mode.start_mode(state, choice)
+            state["status"] = "running"
+    elif state["status"] == "obstacle_choice":
+        if choice == "single":                      # top card: obstacles off
+            versus_mode.start_mode(state, "single", obstacles=False)
+            state["status"] = "running"
+        elif choice == "multi":                     # middle card: obstacles on
+            versus_mode.start_mode(state, "single", obstacles=True)
             state["status"] = "running"
     elif state["status"] == "difficulty":
         versus_mode.start_mode(state, "ai", DIFFICULTY_BY_CARD[choice])
         state["status"] = "running"
 
+        
 def run_game():
     ui.setup_ui()
 

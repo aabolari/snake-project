@@ -22,15 +22,16 @@ def setup_screen():
     win.tracer(0)             # we refresh the screen ourselves, once per frame
     return win
 
+
 def draw_grid():
     """Draw a faint grid inside the playable area."""
     half = (GRID_MAX + 0.5) * CELL_SIZE      # Matches the border boundaries exactly
     grid_pen = turtle.Turtle()
     grid_pen.hideturtle()
     grid_pen.speed(0)
-    
-    # Matches the dark theme BACKGROUND_COLOUR ("#1e293b") from config.py[cite: 4]
-    grid_pen.color("#334155") 
+
+    # Matches the dark theme BACKGROUND_COLOUR ("#1e293b") from config.py
+    grid_pen.color("#334155")
     grid_pen.pensize(1)
     grid_pen.penup()
 
@@ -51,6 +52,7 @@ def draw_grid():
         grid_pen.goto(end, y)
         grid_pen.penup()
 
+
 def draw_board():
     """Draw the border around the playable area (drawn once)."""
     half = (GRID_MAX + 0.5) * CELL_SIZE      # 290 pixels with the default config
@@ -67,7 +69,7 @@ def draw_board():
 
 
 def create_pens():
-    """Create the three reusable turtles: painter, scoreboard and message."""
+    """Create the reusable turtles: painter, scoreboard, message and modal."""
     painter = turtle.Turtle()           # stamps snakes, food and obstacles
     painter.hideturtle()
     painter.speed(0)
@@ -96,6 +98,7 @@ def create_pens():
     pens["scoreboard"] = scoreboard
     pens["message"] = message
     pens["modal"] = modal
+
 
 def setup_ui():
     """Call once at startup. Returns the screen."""
@@ -135,24 +138,25 @@ def draw_game(state):
             colour = head_colour if index == 0 else body_colour
             stamp_cell(cell, "square", colour)
 
-
     update_scoreboard(state)
 
     if state["status"] == "menu":
-        pens["scoreboard"].clear() # Hide scoreboard on menu
+        pens["scoreboard"].clear()          # Hide scoreboard on menu
         draw_main_menu(state)
+    elif state["status"] == "obstacle_choice":
+        pens["scoreboard"].clear()
+        draw_obstacle_menu(state)
     elif state["status"] == "difficulty":
         pens["scoreboard"].clear()
         draw_difficulty_menu(state)
     elif state["status"] == "game_over":
-        pens["message"].clear() # Hide normal pause messages
+        pens["message"].clear()             # Hide normal pause messages
         draw_game_over(state)
     else:
-        pens["modal"].clear() # Ensure the modal disappears when playing
+        pens["modal"].clear()               # Ensure the modal disappears when playing
         show_status_message(state)
-        
-    turtle.update()
 
+    turtle.update()
 
 
 def update_scoreboard(state):
@@ -191,7 +195,9 @@ def show_status_message(state):
                       align="center", font=("Arial", 18, "bold"))
 
 
-# In ui.py
+# ----------------------------------------------------------------------
+# Menus
+# ----------------------------------------------------------------------
 def draw_ui_card(pen, cx, cy, width, height, theme_color, fill_color, title, subtitle):
     """Draws a stylized, clickable card centered at (cx, cy) with a solid background."""
     start_x = cx - (width / 2)
@@ -201,17 +207,17 @@ def draw_ui_card(pen, cx, cy, width, height, theme_color, fill_color, title, sub
     pen.penup()
     pen.goto(start_x, start_y)
     # The first argument is the border, the second is the inner fill
-    pen.color(theme_color, fill_color) 
+    pen.color(theme_color, fill_color)
     pen.pensize(3)
     pen.pendown()
-    
-    pen.begin_fill() # Start tracking the shape area
+
+    pen.begin_fill()                          # Start tracking the shape area
     for _ in range(2):
         pen.forward(width)
         pen.right(90)
         pen.forward(height)
         pen.right(90)
-    pen.end_fill() # Physically paint the interior
+    pen.end_fill()                            # Physically paint the interior
     pen.penup()
 
     # 2. Draw the Title (Must happen AFTER end_fill)
@@ -225,11 +231,10 @@ def draw_ui_card(pen, cx, cy, width, height, theme_color, fill_color, title, sub
     pen.write(subtitle, align="center", font=("Arial", 10, "normal"))
 
 
-# In ui.py
 def draw_main_menu(state):
     modal = pens["modal"]
     modal.clear()
-    
+
     if state["status"] != "menu":
         return
 
@@ -242,10 +247,10 @@ def draw_main_menu(state):
 
     # Card 1: Sky Blue Border, Deep Slate Background
     draw_ui_card(modal, 0, 60, 300, 80, BORDER_COLOUR, "#0f172a", "SINGLE PLAYER", "Classic snake experience")
-    
+
     # Card 2: Bright Green Border, Dark Emerald Background
     draw_ui_card(modal, 0, -40, 300, 80, HEAD_COLOUR, "#064e3b", "MULTIPLAYER", "Challenge another player")
-    
+
     # Card 3: Bright Red Border, Dark Crimson Background
     draw_ui_card(modal, 0, -140, 300, 80, FOOD_COLOUR, "#450a0a", "VS AI", "Play against the smart snake")
 
@@ -266,9 +271,24 @@ def draw_difficulty_menu(state):
     draw_ui_card(modal, 0, -140, 300, 80, FOOD_COLOUR, "#450a0a", "HARD", "Never traps itself (press 3)")
 
 
+def draw_obstacle_menu(state):
+    """The obstacles Off / On cards shown after choosing Single Player."""
+    modal = pens["modal"]
+    modal.clear()
+
+    modal.goto(0, 180)
+    modal.color(TEXT_COLOUR)
+    modal.write("SINGLE PLAYER", align="center", font=("Arial", 28, "bold"))
+    modal.goto(0, 140)
+    modal.write("OBSTACLES?", align="center", font=("Arial", 12, "normal"))
+
+    draw_ui_card(modal, 0, 60, 300, 80, BORDER_COLOUR, "#0f172a", "NO OBSTACLES", "Classic open board (press 1)")
+    draw_ui_card(modal, 0, -40, 300, 80, OBSTACLE_COLOUR, "#1e293b", "WITH OBSTACLES", "Fixed blocks on the board (press 2)")
+
+
 def draw_game_over(state):
     modal = pens["modal"]
-    modal.clear() # CRITICAL: Prevents ghosting from previous frames
+    modal.clear()             # CRITICAL: Prevents ghosting from previous frames
 
     # Only draw if the game is actually over
     if state["status"] != "game_over":
@@ -276,7 +296,7 @@ def draw_game_over(state):
 
     # 1. Draw the background box
     modal.goto(-150, 100)
-    modal.color(BORDER_COLOUR, "#0f172a") # Border color, darker fill
+    modal.color(BORDER_COLOUR, "#0f172a")     # Border color, darker fill
     modal.pendown()
     modal.pensize(2)
     modal.begin_fill()
@@ -290,7 +310,7 @@ def draw_game_over(state):
 
     # 2. Draw the text
     modal.goto(0, 40)
-    modal.color("#f87171") # Soft Red
+    modal.color("#f87171")                    # Soft Red
     title = state.get("result") or "GAME OVER"        # versus modes set a result such as "P1 WINS!"
     modal.write(title, align="center", font=("Arial", 24, "bold"))
 
@@ -305,12 +325,12 @@ def draw_game_over(state):
     modal.write(text, align="center", font=("Arial", 14, "normal"))
 
     modal.goto(0, -50)
-    modal.color(HEAD_COLOUR) # Use the snake green for the button text
+    modal.color(HEAD_COLOUR)                  # Use the snake green for the button text
     modal.write("Press SPACE to Restart", align="center", font=("Arial", 14, "bold"))
 
 
 # ----------------------------------------------------------------------
-# Keyboard
+# Keyboard and mouse
 # ----------------------------------------------------------------------
 def bind_keys(on_direction, on_pause, on_restart, on_menu_click):
     """Connect keys to functions that main.py provides."""
@@ -331,6 +351,7 @@ def bind_keys(on_direction, on_pause, on_restart, on_menu_click):
 
     # The Hit-Testing Function
     def handle_mouse_click(x, y):
+        print("click at:", x, y)              # temporary debug line, remove once it works
         # Check X bounds (Width is 300, so -150 to 150)
         if -150 <= x <= 150:
             # Card 1: Y=60, Height=80 (Bounds: 20 to 100)

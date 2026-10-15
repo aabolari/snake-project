@@ -66,3 +66,6 @@ SNAKE_COLOURS = [(HEAD_COLOUR, BODY_COLOUR), ("#f59e0b", "#fcd34d")]
 
 # Chance (0 to 1) that the AI ignores the food and makes a random safe move
 AI_MISTAKE_CHANCE = {"easy": 0.35, "medium": 0.12, "hard": 0.0}
+
+OBSTACLE_COUNT = 8     # how many obstacle cells in single player
+SAFE_RADIUS = 4         # no obstacles within this many cells of the snake's start
